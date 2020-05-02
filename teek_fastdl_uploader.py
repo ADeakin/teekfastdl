@@ -13,7 +13,7 @@ ACCESS_KEY = ''
 SECRET_KEY = ''
 SERVICE_ENDPOINT = 'https://s3.us-east-2.wasabisys.com'
 BUCKET = 'teekfastdl'
-LOCAL_FASTDL = ''
+LOCAL_FASTDL = '/home/anthony/Workspace/teekfastdl/fastdl/' #you need the trailing slash
 
 def upload_to_aws(s3, bucket, local_file, s3_file):
     
@@ -46,6 +46,8 @@ try:
             filename_noprefix = filename[len(LOCAL_FASTDL):]
             if filename_noprefix not in bucket_filelist:
                 upload_to_aws(s3,BUCKET,filename,filename_noprefix)
+    else:
+        logger.info('{0} not does not exist or is empty'.format(LOCAL_FASTDL))
 
 except Exception as e:
     logger.error('Error reading or comparing files')
