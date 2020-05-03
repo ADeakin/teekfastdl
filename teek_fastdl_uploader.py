@@ -5,7 +5,7 @@ from logging.handlers import RotatingFileHandler
 
 logger = logging.getLogger('teekfastdl_uploader')
 logger.setLevel(logging.INFO)
-handler = RotatingFileHandler('teekfastdl_uploader.log', maxBytes=200000, backupCount=10)
+handler = RotatingFileHandler('teekfastdl_uploader.log', maxBytes=2000000, backupCount=10)
 logger.addHandler(handler)
 logger.addHandler(logging.StreamHandler())
 
@@ -15,7 +15,7 @@ SERVICE_ENDPOINT = 'https://s3.us-east-2.wasabisys.com'
 BUCKET = 'teekfastdl'
 LOCAL_FASTDL = '/home/anthony/Workspace/teekfastdl/fastdl/' #you need the trailing slash
 
-def upload_to_aws(s3, bucket, local_file, s3_file):
+def upload_to_aws(s3, bucket, local_file, s3_file=None):
     
     #mirror local file structure
     if s3_file is None:
@@ -29,15 +29,36 @@ def upload_to_aws(s3, bucket, local_file, s3_file):
         logger.error('Failed to upload {0} to s3 as {1}'.format(local_file, s3_file))
         logger.error(e,exc_info=True)
 
+def get_bucket_filetree(s3, bucket_name):
+    
+    bucket_filelist = []
+
+    more_items = True
+    continuation_token = ''
+
+    while more_items:
+        bucket = s3.list_objects_v2(Bucket=BUCKET, ContinuationToken=continuation_token)
+
+        if bucket.get('Contents') is not None:
+            for item in bucket.get('Contents'):
+                bucket_filelist.append(item.get('Key'))
+
+        if not bucket.get('IsTruncated'):
+            more_items = False
+        else:
+            continuation_token = str(bucket.get('NextContinuationToken'))   
+    
+    return bucket_filelist
+
 try:
     s3 = boto3.client('s3', endpoint_url=SERVICE_ENDPOINT, aws_access_key_id=ACCESS_KEY,aws_secret_access_key=SECRET_KEY)
 
-    bucket = s3.list_objects_v2(Bucket=BUCKET)
-    bucket_filelist = []
-
-    if bucket.get('Contents') is not None:
-        for item in bucket.get('Contents'):
-            bucket_filelist.append(item.get('Key'))
+    try:        
+        bucket_filelist = get_bucket_filetree(s3,BUCKET)
+    except Exception as e:
+        logger.error('Failed to read bucket filelist')
+        logger.error(e,exc_info=True)
+        raise SystemExit # Cant continue after this or it'll try to upload stuff that's probably already in the bucket
 
     fastdl = glob.iglob(LOCAL_FASTDL + '**/*.*', recursive=True)
 
